@@ -78,7 +78,7 @@ const Index = () => {
           )}
           {tab === "upload" && <UploadScreen onComplete={handleUploadComplete} />}
           {tab === "leaderboard" && <LeaderboardScreen currentUserId={session.user.id} />}
-          {tab === "rewards" && <RewardsScreen points={points} />}
+          {tab === "rewards" && <RewardsScreen points={points} onPointsUpdate={(p) => setPoints(p)} />}
           {tab === "profile" && <ProfileScreen points={points} />}
         </motion.div>
       </AnimatePresence>

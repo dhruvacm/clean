@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
-import { Camera, Upload, CheckCircle2, XCircle, MapPin, Send, Loader2 } from "lucide-react";
+import { Camera, Upload, CheckCircle2, XCircle, MapPin, Send, Loader2, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 type Step = "upload" | "detecting" | "result" | "location" | "success";
 
@@ -10,13 +12,36 @@ interface UploadScreenProps {
   onComplete: (pts: number) => void;
 }
 
+interface AIAnalysis {
+  detected: boolean;
+  garbage_type: string;
+  severity: string;
+  points: number;
+  description: string;
+}
+
 const STEPS = ["Upload", "Detect", "Submit"];
+
+const severityColors: Record<string, string> = {
+  small: "text-yellow-600 bg-yellow-50",
+  medium: "text-orange-600 bg-orange-50",
+  large: "text-red-600 bg-red-50",
+  extreme: "text-red-800 bg-red-100",
+};
+
+const severityLabels: Record<string, string> = {
+  small: "Minor Littering",
+  medium: "Moderate Waste",
+  large: "Significant Dumping",
+  extreme: "Major Environmental Hazard",
+};
 
 const UploadScreen = ({ onComplete }: UploadScreenProps) => {
   const [step, setStep] = useState<Step>("upload");
   const [image, setImage] = useState<string | null>(null);
-  const [detected, setDetected] = useState(true);
-  const [location, setLocation] = useState("Auto-detecting location...");
+  const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
+  const [location, setLocation] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const currentStepIndex = (() => {
     if (step === "upload") return 0;
@@ -24,16 +49,33 @@ const UploadScreen = ({ onComplete }: UploadScreenProps) => {
     return 2;
   })();
 
-  const handleFile = useCallback((file: File) => {
+  const handleFile = useCallback(async (file: File) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      setImage(e.target?.result as string);
+    reader.onload = async (e) => {
+      const base64 = e.target?.result as string;
+      setImage(base64);
       setStep("detecting");
-      // Simulate AI detection
-      setTimeout(() => {
-        setDetected(Math.random() > 0.2);
+
+      try {
+        const { data, error } = await supabase.functions.invoke("analyze-garbage", {
+          body: { imageBase64: base64 },
+        });
+
+        if (error) {
+          toast.error("AI analysis failed. Please try again.");
+          setStep("upload");
+          setImage(null);
+          return;
+        }
+
+        setAnalysis(data as AIAnalysis);
         setStep("result");
-      }, 2000);
+      } catch (err) {
+        console.error("Analysis error:", err);
+        toast.error("Failed to analyze image.");
+        setStep("upload");
+        setImage(null);
+      }
     };
     reader.readAsDataURL(file);
   }, []);
@@ -48,18 +90,60 @@ const UploadScreen = ({ onComplete }: UploadScreenProps) => {
   );
 
   const handleProceed = () => {
-    setLocation("MG Road, Sector 14, Gurugram");
-    setStep("location");
+    // Try to get current location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setLocation(`${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`);
+          setStep("location");
+        },
+        () => {
+          setLocation("");
+          setStep("location");
+        }
+      );
+    } else {
+      setStep("location");
+    }
   };
 
-  const handleSubmit = () => {
-    setStep("success");
-    setTimeout(() => onComplete(50), 2500);
+  const handleSubmit = async () => {
+    if (!analysis || !location.trim()) {
+      toast.error("Please enter a location.");
+      return;
+    }
+
+    setSubmitting(true);
+    const pts = analysis.points;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Insert report
+      await supabase.from("reports").insert({
+        user_id: user.id,
+        location_text: location,
+        garbage_type: analysis.garbage_type,
+        severity: analysis.severity,
+        points_earned: pts,
+        ai_analysis: analysis.description,
+      } as any);
+
+      setStep("success");
+      setTimeout(() => onComplete(pts), 2500);
+    } catch (err) {
+      console.error("Submit error:", err);
+      toast.error("Failed to submit report.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleReset = () => {
     setStep("upload");
     setImage(null);
+    setAnalysis(null);
   };
 
   return (
@@ -167,13 +251,13 @@ const UploadScreen = ({ onComplete }: UploadScreenProps) => {
               <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin" />
               <Loader2 size={24} className="absolute inset-0 m-auto text-primary animate-spin" />
             </div>
-            <h2 className="text-lg font-bold text-foreground mb-1">Analyzing Image...</h2>
-            <p className="text-sm text-muted-foreground">AI is scanning for garbage</p>
+            <h2 className="text-lg font-bold text-foreground mb-1">AI Analyzing Image...</h2>
+            <p className="text-sm text-muted-foreground">Detecting garbage type and severity</p>
           </motion.div>
         )}
 
         {/* RESULT */}
-        {step === "result" && (
+        {step === "result" && analysis && (
           <motion.div
             key="result"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -194,10 +278,28 @@ const UploadScreen = ({ onComplete }: UploadScreenProps) => {
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
               className="mb-4"
             >
-              {detected ? (
-                <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-xl">
-                  <CheckCircle2 size={20} />
-                  <span className="font-semibold">Garbage Detected ✅</span>
+              {analysis.detected ? (
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-xl">
+                    <CheckCircle2 size={20} />
+                    <span className="font-semibold">Garbage Detected ✅</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-left">
+                    <div className="glass-card p-3">
+                      <p className="text-xs text-muted-foreground">Type</p>
+                      <p className="text-sm font-semibold text-foreground capitalize">{analysis.garbage_type}</p>
+                    </div>
+                    <div className="glass-card p-3">
+                      <p className="text-xs text-muted-foreground">Severity</p>
+                      <p className={`text-sm font-semibold capitalize px-2 py-0.5 rounded-lg inline-block ${severityColors[analysis.severity] || ""}`}>
+                        {severityLabels[analysis.severity] || analysis.severity}
+                      </p>
+                    </div>
+                    <div className="glass-card p-3 col-span-2">
+                      <p className="text-xs text-muted-foreground">Points to Earn</p>
+                      <p className="text-xl font-bold text-primary">+{analysis.points} pts</p>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-2 bg-destructive/10 text-destructive px-4 py-2 rounded-xl">
@@ -207,11 +309,11 @@ const UploadScreen = ({ onComplete }: UploadScreenProps) => {
               )}
             </motion.div>
             <p className="text-sm text-muted-foreground mb-5">
-              {detected
-                ? "We found waste in this image. Proceed to report it!"
+              {analysis.detected
+                ? analysis.description
                 : "This image doesn't seem to contain garbage. Try another photo."}
             </p>
-            {detected ? (
+            {analysis.detected ? (
               <Button
                 onClick={handleProceed}
                 className="gradient-hero border-0 text-primary-foreground rounded-xl px-8 gap-2"
@@ -239,12 +341,13 @@ const UploadScreen = ({ onComplete }: UploadScreenProps) => {
             <h2 className="text-lg font-bold text-foreground mb-4 text-center">
               Confirm Location
             </h2>
-            {/* Map placeholder */}
             <div className="w-full h-40 rounded-xl bg-secondary flex items-center justify-center mb-4 relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5" />
               <div className="text-center z-10">
                 <MapPin size={28} className="text-primary mx-auto mb-1" />
-                <p className="text-xs font-medium text-secondary-foreground">Map Preview</p>
+                <p className="text-xs font-medium text-secondary-foreground">
+                  {location ? "Location detected" : "Enter location below"}
+                </p>
               </div>
             </div>
             <div className="mb-4">
@@ -254,21 +357,34 @@ const UploadScreen = ({ onComplete }: UploadScreenProps) => {
               <Input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
+                placeholder="Enter location or address"
                 className="rounded-xl"
               />
             </div>
+            {analysis && (
+              <div className="glass-card p-3 mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Points for this report</p>
+                  <p className="text-lg font-bold text-primary">+{analysis.points} pts</p>
+                </div>
+                <div className={`px-2 py-1 rounded-lg text-xs font-semibold ${severityColors[analysis.severity] || ""}`}>
+                  {severityLabels[analysis.severity] || analysis.severity}
+                </div>
+              </div>
+            )}
             <Button
               onClick={handleSubmit}
+              disabled={submitting || !location.trim()}
               className="w-full gradient-hero border-0 text-primary-foreground rounded-xl gap-2"
             >
-              <Send size={16} />
+              {submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               Submit Report
             </Button>
           </motion.div>
         )}
 
         {/* SUCCESS */}
-        {step === "success" && (
+        {step === "success" && analysis && (
           <motion.div
             key="success"
             initial={{ opacity: 0, scale: 0.8 }}
@@ -305,9 +421,17 @@ const UploadScreen = ({ onComplete }: UploadScreenProps) => {
               transition={{ delay: 0.8, type: "spring" }}
               className="inline-flex items-center gap-2 bg-primary/10 text-primary px-5 py-2.5 rounded-xl"
             >
-              <span className="text-2xl font-bold">+50</span>
+              <span className="text-2xl font-bold">+{analysis.points}</span>
               <span className="text-sm font-medium">Clean Points earned!</span>
             </motion.div>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+              className="text-xs text-muted-foreground mt-3"
+            >
+              {analysis.garbage_type} • {severityLabels[analysis.severity]}
+            </motion.p>
           </motion.div>
         )}
       </AnimatePresence>
