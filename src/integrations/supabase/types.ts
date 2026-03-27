@@ -50,6 +50,72 @@ export type Database = {
         }
         Relationships: []
       }
+      redemptions: {
+        Row: {
+          created_at: string
+          id: string
+          points_spent: number
+          reward_name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          points_spent: number
+          reward_name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          points_spent?: number
+          reward_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      reports: {
+        Row: {
+          ai_analysis: string | null
+          created_at: string
+          garbage_type: string | null
+          id: string
+          image_url: string | null
+          latitude: number | null
+          location_text: string | null
+          longitude: number | null
+          points_earned: number
+          severity: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_analysis?: string | null
+          created_at?: string
+          garbage_type?: string | null
+          id?: string
+          image_url?: string | null
+          latitude?: number | null
+          location_text?: string | null
+          longitude?: number | null
+          points_earned?: number
+          severity?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_analysis?: string | null
+          created_at?: string
+          garbage_type?: string | null
+          id?: string
+          image_url?: string | null
+          latitude?: number | null
+          location_text?: string | null
+          longitude?: number | null
+          points_earned?: number
+          severity?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
