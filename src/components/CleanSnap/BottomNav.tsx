@@ -1,7 +1,7 @@
-import { Home, Camera, Trophy, Award } from "lucide-react";
+import { Home, Camera, Trophy, Award, User } from "lucide-react";
 import { motion } from "framer-motion";
 
-type Tab = "home" | "upload" | "leaderboard" | "rewards";
+type Tab = "home" | "upload" | "leaderboard" | "rewards" | "profile";
 
 interface BottomNavProps {
   active: Tab;
@@ -13,6 +13,7 @@ const tabs: { id: Tab; icon: typeof Home; label: string }[] = [
   { id: "upload", icon: Camera, label: "Report" },
   { id: "leaderboard", icon: Trophy, label: "Board" },
   { id: "rewards", icon: Award, label: "Rewards" },
+  { id: "profile", icon: User, label: "Profile" },
 ];
 
 const BottomNav = ({ active, onChange }: BottomNavProps) => {
