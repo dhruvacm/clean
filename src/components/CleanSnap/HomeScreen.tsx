@@ -1,4 +1,4 @@
-import { Camera, Leaf, MapPin, TrendingUp } from "lucide-react";
+import { Camera, Leaf, TrendingUp } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import heroImg from "@/assets/hero-illustration.png";
@@ -74,7 +74,7 @@ const HomeScreen = ({ points, reportsToday, onUpload }: HomeScreenProps) => {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <Camera size={16} className="text-primary" />
             </div>
-            <span className="text-xs font-medium text-muted-foreground">Today</span>
+            <span className="text-xs font-medium text-muted-foreground">Total</span>
           </div>
           <p className="text-2xl font-bold text-foreground">{reportsToday}</p>
           <p className="text-xs text-muted-foreground">Reports submitted</p>
@@ -84,41 +84,11 @@ const HomeScreen = ({ points, reportsToday, onUpload }: HomeScreenProps) => {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <TrendingUp size={16} className="text-primary" />
             </div>
-            <span className="text-xs font-medium text-muted-foreground">Streak</span>
+            <span className="text-xs font-medium text-muted-foreground">Points</span>
           </div>
-          <p className="text-2xl font-bold text-foreground">5 days</p>
-          <p className="text-xs text-muted-foreground">Keep it going!</p>
+          <p className="text-2xl font-bold text-foreground">{points}</p>
+          <p className="text-xs text-muted-foreground">Clean Points earned</p>
         </div>
-      </motion.div>
-
-      {/* Recent Activity */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="glass-card p-4"
-      >
-        <h3 className="text-sm font-semibold text-foreground mb-3">Recent Activity</h3>
-        {[
-          { loc: "MG Road, Sector 14", time: "2h ago", pts: 50 },
-          { loc: "Central Park, Block C", time: "Yesterday", pts: 50 },
-        ].map((item, i) => (
-          <div
-            key={i}
-            className="flex items-center justify-between py-2.5 border-b border-border last:border-0"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center">
-                <MapPin size={14} className="text-secondary-foreground" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">{item.loc}</p>
-                <p className="text-xs text-muted-foreground">{item.time}</p>
-              </div>
-            </div>
-            <span className="text-xs font-semibold text-primary">+{item.pts}</span>
-          </div>
-        ))}
       </motion.div>
     </div>
   );
